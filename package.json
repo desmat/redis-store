@@ -1,0 +1,36 @@
+{
+  "name": "@desmat/redis-store",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/desmat/redis-store.git"
+  },
+  "keywords": [
+    "utility",
+    "library",
+    "redis",
+    "store"
+  ],
+  "author": "Mathieu Desjarlais",
+  "license": "MIT",
+  "dependencies": {
+    "@desmat/utils": "^1.0.0",
+    "@upstash/redis": "^1.34.3"
+  },
+  "devDependencies": {
+    "typescript": "^4.0.0"
+  }
+}
