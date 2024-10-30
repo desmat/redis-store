@@ -31,7 +31,7 @@ export class RedisStore<T extends RedisStoreRecord> {
   key: string;
   setKey: string;
   valueKey: (id: string) => string;
-  recordOptions: any;
+  options: any;
   debug: boolean;
 
   constructor({
@@ -39,26 +39,29 @@ export class RedisStore<T extends RedisStoreRecord> {
     token,
     key,
     setKey,
-    recordOptions,
+    options,
     debug,
   }: {
-    url: string,
-    token: string,
     key: string,
     setKey?: string,
-    recordOptions?: any,
+    options?: any,
+    url?: string,
+    token?: string,
     debug?: boolean,
   }) {
-    this.redis = new Redis({ url, token });
+    this.redis = new Redis({
+      url: url || process.env.KV_REST_API_URL,
+      token: token || process.env.KV_REST_API_TOKEN
+    });
     this.key = key;
     this.setKey = setKey || key + "s";
     this.valueKey = (id: string) => `${key}:${id}`;
-    this.recordOptions = recordOptions;
+    this.options = options;
     this.debug = !!debug;
   }
 
   lookupKeys(value: any, options?: any) {
-    options = { ...this.recordOptions, ...options };
+    options = { ...this.options, ...options };
     this.debug && console.log(`RedisStore.lookupKeys<${this.key}>.lookupKeys`, { value, options });
 
     /* 
@@ -116,7 +119,7 @@ export class RedisStore<T extends RedisStoreRecord> {
     return response > 0;
   }
 
-  async get(id: string): Promise<T | undefined> {
+  async get(id: string, options?: any): Promise<T | undefined> {
     this.debug && console.log(`RedisStore<${this.key}>.get`, { id });
 
     const response = (await this.redis.json.get(this.valueKey(id), "$") as any[]);
@@ -124,7 +127,7 @@ export class RedisStore<T extends RedisStoreRecord> {
     this.debug && console.log(`RedisStore<${this.key}>.get`, { response });
 
     let value: T | undefined;
-    if (response && response[0] && !response[0].deletedAt) {
+    if (response && response[0] && !(response[0].deletedAt && !options?.deleted)) {
       value = response[0] as T;
     }
 
@@ -246,10 +249,10 @@ export class RedisStore<T extends RedisStoreRecord> {
   }
 
   async create(value: any, options?: any): Promise<T> {
-    this.debug && console.log(`RedisStore<${this.key}>.create`, { value, options, recordOptions: this.recordOptions });
+    this.debug && console.log(`RedisStore<${this.key}>.create`, { value, options, this_options: this.options });
 
     const now = moment().valueOf();
-    options = { ...this.recordOptions, ...options };
+    options = { ...this.options, ...options };
 
     const createdValue = {
       id: value.id || uuid(),
@@ -287,7 +290,7 @@ export class RedisStore<T extends RedisStoreRecord> {
     }
 
     const now = moment().valueOf();
-    options = { ...this.recordOptions, ...options }
+    options = { ...this.options, ...options }
 
     const updatedValue = {
       ...value,
@@ -325,33 +328,33 @@ export class RedisStore<T extends RedisStoreRecord> {
     return updatedValue;
   }
 
-  async delete(id: string, options: any = {}): Promise<T> {
+  async delete(id: string, options: any = {}): Promise<T | undefined> {
     this.debug && console.log(`RedisStore<${this.key}>.delete`, { id, options });
 
     if (!id) {
       throw `Cannot delete ${this.key}: null id`;
     }
 
-    options = { ...this.recordOptions, ...options };
-    const value = await this.get(id)
+    options = { ...this.options, ...options };
+    const value = await this.get(id, { deleted: true });
     if (!value) {
-      throw `Cannot update ${this.key}: does not exist: ${id}`;
+      console.warn(`RedisStore<${this.key}>.delete WARNING: does not exist: ${id}`);
     }
 
-    const lookupKeys = this.lookupKeys(value, options);
+    const lookupKeys = value && this.lookupKeys(value, options);
     this.debug && console.log(`RedisStore<${this.key}>.delete`, { lookupKeys });
 
-    value.deletedAt = moment().valueOf();
+    const deletedAt = moment().valueOf();
     const response = await Promise.all([
       options.hardDelete
         ? this.redis.json.del(this.valueKey(id), "$")
-        : this.redis.json.set(this.valueKey(id), "$", { ...value, deletedAt: moment().valueOf() }),
+        : this.redis.json.set(this.valueKey(id), "$.deletedAt", deletedAt),
       this.redis.zrem(this.setKey, id),
       ...(lookupKeys ? lookupKeys.map((lookupKey: any) => this.redis.zrem(lookupKey[0], lookupKey[1])) : []),
     ]);
 
     this.debug && console.log(`RedisStore<${this.key}>.delete`, { response });
 
-    return value;
+    return value ? { ...value, deletedAt } : undefined;
   }
 }
