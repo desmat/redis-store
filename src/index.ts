@@ -134,7 +134,9 @@ export class RedisStore<T extends RedisStoreRecord> {
   async scan(query: any = {}): Promise<Set<string>> {
     this.debug && console.log(`RedisStore<${this.key}>.scan`, { query });
 
-    const count = query.count;
+    !query.count && console.warn(`RedisStore.RedisStore<${this.key}>.find WARNING: scan command with no count provided: setting count at 999`);
+
+    const count = query.count || 999;
     const match = this.valueKey(query.scan);
     let keys = new Set<string>();
     let nextCursor = "0";
@@ -222,7 +224,7 @@ export class RedisStore<T extends RedisStoreRecord> {
     }
 
     // don't mget too many at once otherwise 💥
-    const blockSize = 512;
+    const blockSize = 256;
     const blocks = keys && keys.length && Array
       .apply(null, Array(Math.ceil(keys.length / blockSize)))
       .map((v: any, block: number) => (keys || [])
