@@ -26,7 +26,7 @@ export type RedisStoreRecord = {
   deletedAt?: number,
 };
 
-export class RedisStore<T extends RedisStoreRecord> {
+export default class RedisStore<T extends RedisStoreRecord> {
   redis: Redis;
   key: string;
   setKey: string;
@@ -49,10 +49,17 @@ export class RedisStore<T extends RedisStoreRecord> {
     token?: string,
     debug?: boolean,
   }) {
+    const _url = url || process.env.KV_REST_API_URL;
+    const _token = token || process.env.KV_REST_API_TOKEN;
+
+    if (!_url) throw 'Error creating RedisStore: `url` is required: either provide in constructor or via environment variable `KV_REST_API_URL`'
+    if (!_token) throw 'Error creating RedisStore: `token` is required: either provide in constructor or via environment variable `KV_REST_API_TOKEN`'
+
     this.redis = new Redis({
-      url: url || process.env.KV_REST_API_URL,
-      token: token || process.env.KV_REST_API_TOKEN
+      url: _url,
+      token: _token
     });
+
     this.key = key;
     this.setKey = setKey || key + "s";
     this.valueKey = (id: string) => `${key}:${id}`;

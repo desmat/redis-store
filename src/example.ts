@@ -1,4 +1,4 @@
-import { RedisStore } from "./index";
+import RedisStore from "./index";
 require('dotenv').config();
 
 type User = {
@@ -19,6 +19,9 @@ const ThingOptions = {
     user: "createdBy", // enable .find({ user: <USERID> })
   },
 };
+
+// with environment variables KV_REST_API_URL and KV_REST_API_TOKEN
+// or `url` and `token` keys provided to RedisStore constructor
 
 const store = {
   users: new RedisStore<User>({ key: "user" }),
