@@ -1,13 +1,31 @@
 # @desmat/redis-store
 
+[![NPM Version](https://img.shields.io/npm/v/%40desmat%2Fredis-store?link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2F%40desmat%2Futils)](https://www.npmjs.com/package/@desmat/redis-store)
+[![license](https://img.shields.io/npm/l/@desmat/utils?link=LICENSE)](LICENSE)
+
 A lightweight library to facilitate using the (in)famously fast in-memory database as your primary data store for your app’s entities and their relationships.
 
-Leans into Redis’ strong suits to bring relational aspects to a simple but performant KV store:
+Leans into Redis’ strong suits to bring relational aspects to the simple but performant KV store:
 - Lots of small read/writes
 - JSON keys for storing entities (no migration scripts required)
 - ZSET keys to track lists and relations
 
-Plays well with Upstash and Vercel but any Redis instance supported via REST API.
+Plays well with Upstash and Vercel but will work with any Redis instance via REST API.
+
+
+## Installation
+
+Install via npm:
+
+```bash
+npm install @desmat/redis-store
+```
+
+Or with Yarn:
+
+```bash
+yarn add @yourusername/redis-store
+```
 
 
 ## Getting Started
@@ -16,11 +34,6 @@ Below shows a simple schema with users and things belonging to users, some data 
 
 `npm run example` to run [example.ts](./src/example.ts).
 
-### Install the library into your project 
-
-```bash 
-npm install @desmat/redis-store
-```
 
 ### Setup environment variables
 
