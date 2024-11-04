@@ -19,6 +19,7 @@
     "type": "git",
     "url": "https://github.com/desmat/redis-store.git"
   },
+  "homepage": "https://www.npmjs.com/package/@desmat/redis-store",
   "keywords": [
     "utility",
     "library",
