@@ -217,7 +217,7 @@ export default class RedisStore<T extends RedisStoreRecord> {
     this.debug && console.log(`RedisStore<${this.key}>.find`, { query });
 
     const keys = Array.isArray(query.id)
-      ? Array.from(await this.ids(query))
+      ? query.id
         .map((id: string) => id && this.valueKey(id))
         .filter(Boolean)
       : Array.from(await this.ids(query))

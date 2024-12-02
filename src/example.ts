@@ -31,7 +31,7 @@ const ThingOptions = {
 
 // with environment variables KV_REST_API_URL and KV_REST_API_TOKEN
 // or `url` and `token` keys provided to RedisStore constructor
-// const debug = true;
+const debug = true;
 const store = {
   users: new RedisStore<User>({ key: "example-user", debug }),
   categories: new RedisStore<Category>({ key: "example-category", setKey: "example-categories", debug }),
