@@ -26,6 +26,17 @@ export type RedisStoreRecord = {
   deletedAt?: number,
 };
 
+// polyfill Set.intersection
+; (function () {
+  // @ts-ignore
+  if (!Set.prototype.intersection) {
+    // @ts-ignore    
+    Set.prototype.intersection = function (other: Set<any>) {
+      return new Set(Array.from(this).filter((value: any) => other.has(value)));
+    }
+  }
+})();
+
 export default class RedisStore<T extends RedisStoreRecord> {
   redis: Redis;
   key: string;
@@ -177,50 +188,36 @@ export default class RedisStore<T extends RedisStoreRecord> {
 
     const queryEntries = query && Object.entries(query);
 
-    // TODO: support more than one
-    if (queryEntries?.length > 1) {
-      throw `redis.find(query) only supports a single query entry pair`;
+    // .ids() or .ids({})
+    if (!queryEntries?.length) {
+      // get all keys via the index set
+      return new Set(await this.redis.zrange(`${this.setKey}`, min, max, { rev: true }) as string[]);
     }
 
-    let ids = [];
-    const queryEntry = queryEntries && queryEntries[0];
-    const [queryKey, queryVal] = queryEntry || [];
-
-    if (queryKey == "id" && Array.isArray(queryVal)) {
-      this.debug && console.log(`RedisStore<${this.key}>.ids special case: query is for IDs`, { ids: queryVal });
-      ids = queryVal;
-    } else {
-      if (queryKey) {
-        /* NOT SUPPORTED FOR NOW
-        if (queryVal == "*") {
-          // lookup keys via the foos:bars lookup set
-          keys = (await this.kv.zrange(`${this.setKey}:${queryKey}s`, 0, -1))
-            // @ts-ignore
-            .map((key: string) => `${this.key}:${key}`);
-        } else */ if (queryVal) {
+    // .ids({ foo: "FOO", bar: "BAR", ... })
+    const setOfIds = await Promise.all(
+      queryEntries.map(([queryKey, queryVal]: [string, string]) => {
+        if (queryVal) {
           // lookup keys via the foos:bar:123 lookup set
-          // @ts-ignore
-          ids = await this.redis.zrange(`${this.setKey}:${queryKey}:${queryVal}`, min, max, { rev: true });
+          return this.redis.zrange(`${this.setKey}:${queryKey}:${queryVal}`, min, max, { rev: true });
         } else {
           throw `redis.find(query) query must have key and value`;
         }
+      })
+    );
 
-        this.debug && console.log(`RedisStore<${this.key}>.ids queried lookup key`, { query, ids });
-      } else {
-        // get all keys via the index set
-        // @ts-ignore
-        ids = await this.redis.zrange(`${this.setKey}`, min, max, { rev: true })
-      }
-    }
+    // @ts-ignore
+    const ids = setOfIds.reduce((prev: Set<any> | undefined, curr: any[]) => new Set(curr).intersection(prev || new Set(curr)), undefined)
+    this.debug && console.log(`RedisStore<${this.key}>.ids queried lookup key`, { query, setOfIds, ids });
 
-    return new Set(ids);
+    return ids;
   }
 
   async find(query: any = {}): Promise<T[]> {
     this.debug && console.log(`RedisStore<${this.key}>.find`, { query });
 
     const keys = Array.isArray(query.id)
-      ? Array.from(await this.ids(query))
+      ? query.id
         .map((id: string) => id && this.valueKey(id))
         .filter(Boolean)
       : Array.from(await this.ids(query))
