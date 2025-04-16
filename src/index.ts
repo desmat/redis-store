@@ -181,10 +181,24 @@ export default class RedisStore<T extends RedisStoreRecord> {
       return this.scan(query);
     }
 
-    const min = query.offset || 0;
-    const max = min + (query.count || 0) - 1;
-    delete query.offset;
+    let count = query.count;
     delete query.count;
+
+    if (typeof (count) != "undefined" && typeof (count) != "number") {
+      console.warn(`RedisStore.RedisStore<${this.key}>.id WARNING: query.count is not a numberXX`);
+      count = undefined;
+    }
+
+    let offset = query.offset;
+    delete query.offset;
+
+    if (typeof (offset) != "undefined" && typeof (offset) != "number") {
+      console.warn(`RedisStore.RedisStore<${this.key}>.id WARNING: query.offset must be a numberYY`);
+      offset = undefined;
+    }
+
+    const min = offset || 0;
+    const max = min + (count || 0) - 1;
 
     const queryEntries = query && Object.entries(query);
 
