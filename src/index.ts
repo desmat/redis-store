@@ -185,7 +185,7 @@ export default class RedisStore<T extends RedisStoreRecord> {
     delete query.count;
 
     if (typeof (count) != "undefined" && typeof (count) != "number") {
-      console.warn(`RedisStore.RedisStore<${this.key}>.id WARNING: query.count is not a numberXX`);
+      console.warn(`RedisStore.RedisStore<${this.key}>.id WARNING: query.count is not a number`);
       count = undefined;
     }
 
@@ -193,7 +193,7 @@ export default class RedisStore<T extends RedisStoreRecord> {
     delete query.offset;
 
     if (typeof (offset) != "undefined" && typeof (offset) != "number") {
-      console.warn(`RedisStore.RedisStore<${this.key}>.id WARNING: query.offset must be a numberYY`);
+      console.warn(`RedisStore.RedisStore<${this.key}>.id WARNING: query.offset must be a number`);
       offset = undefined;
     }
 
