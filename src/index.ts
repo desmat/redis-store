@@ -349,16 +349,16 @@ export default class RedisStore<T extends RedisStoreRecord> {
   async incrementCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
     this.debug && console.log(`RedisStore<${this.key}>.incrementCounters`, { values, delta });
 
-    const counters: string[][] = this.options?.counters || [];
+    const counters: string[] = this.options?.counters || [];
 
     const responses = await Promise.all(
       counters
-        .filter((dims: string[]) => dims.every((d: string) => typeof values[d] != "undefined"))
-        .flatMap((dims: string[]) => {
-          const member = dims.map((d: string) => `${d}=${values[d]}`).join(":");
+        .filter((counter: string) => counter.split(":").every((d: string) => typeof values[d] != "undefined"))
+        .flatMap((counter: string) => {
+          const member = counter.split(":").map((d: string) => `${d}=${values[d]}`).join(":");
           return [
-            this.redis.zincrby(`${this.key}Totals:${dims.join(":")}`, delta.total, member),
-            this.redis.zincrby(`${this.key}Counts:${dims.join(":")}`, delta.count, member),
+            this.redis.zincrby(`${this.key}Totals:${counter}`, delta.total, member),
+            this.redis.zincrby(`${this.key}Counts:${counter}`, delta.count, member),
           ];
         })
     );
@@ -370,13 +370,14 @@ export default class RedisStore<T extends RedisStoreRecord> {
 
   async queryCounter(
     kind: "count" | "counts" | "totals",
-    dims: string[],
+    counter: string,
     exact: Record<string, string | number>,
     range?: { field: string, min?: string, max?: string }
   ): Promise<number | Array<{ member: string, score: number }>> {
-    this.debug && console.log(`RedisStore<${this.key}>.queryCounter`, { kind, dims, exact, range });
+    this.debug && console.log(`RedisStore<${this.key}>.queryCounter`, { kind, counter, exact, range });
 
-    const setKey = `${this.key}${kind == "totals" ? "Totals" : "Counts"}:${dims.join(":")}`;
+    const dims = counter.split(":");
+    const setKey = `${this.key}${kind == "totals" ? "Totals" : "Counts"}:${counter}`;
 
     const prefix = dims
       .filter((d: string) => typeof exact[d] != "undefined")
