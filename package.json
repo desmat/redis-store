@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "example": "ts-node --skipProject ./src/example.ts"
   },
   "repository": {
