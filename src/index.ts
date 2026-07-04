@@ -78,7 +78,7 @@ export default class RedisStore<T extends RedisStoreRecord> {
     this.debug = !!debug;
   }
 
-  lookupKeys(value: any, options?: any) {
+  lookupKeys(value: any, options?: { noLookup?: boolean, lookups?: any }) {
     options = { ...this.options, ...options };
     this.debug && console.log(`RedisStore.lookupKeys<${this.key}>.lookupKeys`, { value, options });
 
@@ -266,7 +266,7 @@ export default class RedisStore<T extends RedisStoreRecord> {
     return values as T[];
   }
 
-  async create(value: any, options?: any): Promise<T> {
+  async create(value: any, options?: { expire?: number, noIndex?: boolean, score?: number, noLookup?: boolean, lookups?: any}): Promise<T> {
     this.debug && console.log(`RedisStore<${this.key}>.create`, { value, options, this_options: this.options });
 
     const now = moment().valueOf();
@@ -284,8 +284,8 @@ export default class RedisStore<T extends RedisStoreRecord> {
 
     const responses = await Promise.all([
       this.redis.json.set(this.valueKey(createdValue.id), "$", createdValue),
-      options.expire && this.redis.expire(this.valueKey(createdValue.id), options.expire),
-      !options.noIndex && this.redis.zadd(this.setKey, { score: createdValue.createdAt, member: createdValue.id }),
+      options?.expire && this.redis.expire(this.valueKey(createdValue.id), options?.expire),
+      !options?.noIndex && this.redis.zadd(this.setKey, { score: createdValue.createdAt, member: createdValue.id }),
       ...(lookupKeys ? lookupKeys.map((lookupKey: any) => this.redis.zadd(lookupKey[0], { score: createdValue.createdAt, member: lookupKey[1] })) : []),
     ]);
 
@@ -346,7 +346,78 @@ export default class RedisStore<T extends RedisStoreRecord> {
     return updatedValue;
   }
 
-  async delete(id: string, options: any = {}): Promise<T | undefined> {
+  async incrementCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
+    this.debug && console.log(`RedisStore<${this.key}>.incrementCounters`, { values, delta });
+
+    const counters: string[][] = this.options?.counters || [];
+
+    const responses = await Promise.all(
+      counters
+        .filter((dims: string[]) => dims.every((d: string) => typeof values[d] != "undefined"))
+        .flatMap((dims: string[]) => {
+          const member = dims.map((d: string) => `${d}=${values[d]}`).join(":");
+          return [
+            this.redis.zincrby(`${this.key}Totals:${dims.join(":")}`, delta.total, member),
+            this.redis.zincrby(`${this.key}Counts:${dims.join(":")}`, delta.count, member),
+          ];
+        })
+    );
+
+    this.debug && console.log(`RedisStore<${this.key}>.incrementCounters`, { responses });
+
+    return responses;
+  }
+
+  async queryCounter(
+    kind: "count" | "counts" | "totals",
+    dims: string[],
+    exact: Record<string, string | number>,
+    range?: { field: string, min?: string, max?: string }
+  ): Promise<number | Array<{ member: string, score: number }>> {
+    this.debug && console.log(`RedisStore<${this.key}>.queryCounter`, { kind, dims, exact, range });
+
+    const setKey = `${this.key}${kind == "totals" ? "Totals" : "Counts"}:${dims.join(":")}`;
+
+    const prefix = dims
+      .filter((d: string) => typeof exact[d] != "undefined")
+      .map((d: string) => `${d}=${exact[d]}`)
+      .join(":");
+
+    // the trailing sentinel scopes the range to the "prefix:" family regardless of whether
+    // the range field itself is the last dim, matching how the original hand-rolled queries worked
+    const hasMore = dims.length > Object.keys(exact).length;
+
+    const minPrefix = range?.min != null ? `${prefix}${prefix ? ":" : ""}${range.field}=${range.min}` : prefix;
+    const maxPrefix = range?.max != null ? `${prefix}${prefix ? ":" : ""}${range.field}=${range.max}` : prefix;
+
+    const min: `[${string}` = `[${minPrefix}${hasMore ? ":\x00" : ""}`;
+    const max: `[${string}` = `[${maxPrefix}${hasMore ? ":\x7f" : ""}`;
+
+    this.debug && console.log(`RedisStore<${this.key}>.queryCounter`, { setKey, min, max });
+
+    if (kind == "count") {
+      const count = await this.redis.zlexcount(setKey, min, max);
+      this.debug && console.log(`RedisStore<${this.key}>.queryCounter`, { count });
+      return count;
+    }
+
+    const raw = await this.redis.zrange(setKey, min, max, { byLex: true, withScores: true }) as any[];
+    this.debug && console.log(`RedisStore<${this.key}>.queryCounter`, { raw });
+
+    // members are returned as-is ("field=value:field=value...") rather than parsed into an
+    // object: some field values (eg namespaced ids) may themselves contain the ":" delimiter,
+    // which only the caller can safely account for when splitting a member back into fields
+    const results = [];
+    for (let i = 0; i < raw.length / 2; i++) {
+      results.push({ member: `${raw[2 * i]}`, score: raw[2 * i + 1] });
+    }
+
+    this.debug && console.log(`RedisStore<${this.key}>.queryCounter`, { results });
+
+    return results;
+  }
+
+  async delete(id: string, options?: { hardDelete?: boolean, noLookup?: boolean, lookups?: any }): Promise<T | undefined> {
     this.debug && console.log(`RedisStore<${this.key}>.delete`, { id, options });
 
     if (!id) {
@@ -364,7 +435,7 @@ export default class RedisStore<T extends RedisStoreRecord> {
 
     const deletedAt = moment().valueOf();
     const response = await Promise.all([
-      options.hardDelete
+      options?.hardDelete
         ? this.redis.json.del(this.valueKey(id), "$")
         : this.redis.json.set(this.valueKey(id), "$.deletedAt", deletedAt),
       this.redis.zrem(this.setKey, id),
