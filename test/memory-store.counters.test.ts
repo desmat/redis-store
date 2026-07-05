@@ -14,12 +14,12 @@ function makeStore() {
   });
 }
 
-test("incrementCounters + queryCounter('count'/'totals'/'counts') for a single-dim counter", async () => {
+test("incCounters + queryCounter('count'/'totals'/'counts') for a single-dim counter", async () => {
   const store = makeStore();
 
-  await store.incrementCounters({ user: "u1", vice: "coffee" }, { total: 100, count: 1 });
-  await store.incrementCounters({ user: "u1", vice: "coffee" }, { total: 50, count: 1 });
-  await store.incrementCounters({ user: "u1", vice: "soda" }, { total: 10, count: 1 });
+  await store.incCounters({ user: "u1", vice: "coffee" }, { total: 100, count: 1 });
+  await store.incCounters({ user: "u1", vice: "coffee" }, { total: 50, count: 1 });
+  await store.incCounters({ user: "u1", vice: "soda" }, { total: 10, count: 1 });
 
   assert.equal(await store.queryCounter("count", "user:vice", { user: "u1" }), 2);
 
@@ -46,10 +46,10 @@ test("queryCounter respects a date range when the ranged field isn't the last di
   ];
 
   for (const row of rows) {
-    await store.incrementCounters({ user: "u1", ...row }, { total: 1, count: 1 });
+    await store.incCounters({ user: "u1", ...row }, { total: 1, count: 1 });
   }
   // a different user should never leak into a scoped query
-  await store.incrementCounters({ user: "u2", date: "20250115", week: "3", type: "coffee" }, { total: 1, count: 1 });
+  await store.incCounters({ user: "u2", date: "20250115", week: "3", type: "coffee" }, { total: 1, count: 1 });
 
   const inRange = await store.queryCounter(
     "counts",
@@ -70,4 +70,25 @@ test("queryCounter respects a date range when the ranged field isn't the last di
     { field: "date", min: "20250101", max: "20250131" }
   );
   assert.equal(exactCount, 3);
+});
+
+test("incCounters warns and skips a counter whose dimensions aren't all present in values", async () => {
+  const store = makeStore();
+  const warnings: any[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => warnings.push(args);
+
+  try {
+    // "user:date:week:type" needs date/week/type too -- only "user:vice" can be incremented
+    await store.incCounters({ user: "u1", vice: "coffee" }, { total: 100, count: 1 });
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0][0], /skipping counter "user:date:week:type"/);
+  assert.match(warnings[0][0], /date, week, type/);
+
+  // the well-formed counter still gets incremented despite the other one being skipped
+  assert.equal(await store.queryCounter("count", "user:vice", { user: "u1" }), 1);
 });

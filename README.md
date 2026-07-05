@@ -208,7 +208,7 @@ const things = new MemoryStore<Thing>({
 ```
 
 Notes on parity with `RedisStore`:
-- `create`/`update`/`delete`/lookup/counter semantics are ported 1:1, including Redis's rank-based (not score-range) windowing for `count`/`offset` in `ids()`/`find()`, and `queryCounter`'s lexicographic range-bound behavior for `incrementCounters`/`queryCounter`.
+- `create`/`update`/`delete`/lookup/counter semantics are ported 1:1, including Redis's rank-based (not score-range) windowing for `count`/`offset` in `ids()`/`find()`, and `queryCounter`'s lexicographic range-bound behavior for `incCounters`/`queryCounter`.
 - `options.expire` is a no-op (data is ephemeral for the life of the process anyway).
 - There's no equivalent to `RedisStore`'s raw `.redis` client escape hatch — code that reaches through it directly for one-off scripts (rather than going through the `Store<T>` methods) isn't portable to `MemoryStore`.
 

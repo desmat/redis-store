@@ -266,10 +266,17 @@ export default class MemoryStore<T extends RedisStoreRecord> implements Store<T>
     return updatedValue;
   }
 
-  async incrementCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
-    this.debug && console.log(`MemoryStore<${this.key}>.incrementCounters`, { values, delta });
+  async incCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
+    this.debug && console.log(`MemoryStore<${this.key}>.incCounters`, { values, delta });
 
     const counters: string[] = this.options?.counters || [];
+
+    counters
+      .filter((counter: string) => !counter.split(":").every((d: string) => typeof values[d] != "undefined"))
+      .forEach((counter: string) => {
+        const missing = counter.split(":").filter((d: string) => typeof values[d] == "undefined");
+        console.warn(`MemoryStore<${this.key}>.incCounters WARNING: skipping counter "${counter}": missing dimension(s) ${missing.join(", ")} in values`, { values });
+      });
 
     counters
       .filter((counter: string) => counter.split(":").every((d: string) => typeof values[d] != "undefined"))

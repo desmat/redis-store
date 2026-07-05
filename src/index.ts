@@ -350,10 +350,17 @@ export default class RedisStore<T extends RedisStoreRecord> implements Store<T> 
     return updatedValue;
   }
 
-  async incrementCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
-    this.debug && console.log(`RedisStore<${this.key}>.incrementCounters`, { values, delta });
+  async incCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
+    this.debug && console.log(`RedisStore<${this.key}>.incCounters`, { values, delta });
 
     const counters: string[] = this.options?.counters || [];
+
+    counters
+      .filter((counter: string) => !counter.split(":").every((d: string) => typeof values[d] != "undefined"))
+      .forEach((counter: string) => {
+        const missing = counter.split(":").filter((d: string) => typeof values[d] == "undefined");
+        console.warn(`RedisStore<${this.key}>.incCounters WARNING: skipping counter "${counter}": missing dimension(s) ${missing.join(", ")} in values`, { values });
+      });
 
     const responses = await Promise.all(
       counters
@@ -367,7 +374,7 @@ export default class RedisStore<T extends RedisStoreRecord> implements Store<T> 
         })
     );
 
-    this.debug && console.log(`RedisStore<${this.key}>.incrementCounters`, { responses });
+    this.debug && console.log(`RedisStore<${this.key}>.incCounters`, { responses });
 
     return responses;
   }

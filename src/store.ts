@@ -13,7 +13,7 @@ export interface Store<T extends RedisStoreRecord> {
   find(query?: any): Promise<T[]>;
   create(value: any, options?: { expire?: number, noIndex?: boolean, score?: number, noLookup?: boolean, lookups?: any }): Promise<T>;
   update(value: any, options?: any): Promise<T>;
-  incrementCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any>;
+  incCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any>;
   queryCounter(
     kind: "count" | "counts" | "totals",
     counter: string,
