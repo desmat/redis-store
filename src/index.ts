@@ -18,6 +18,7 @@
 import moment from "moment";
 import { uuid } from "@desmat/utils";
 import { Redis } from "@upstash/redis";
+import type { Store } from "./store";
 
 export type RedisStoreRecord = {
   id: string,
@@ -25,6 +26,9 @@ export type RedisStoreRecord = {
   updatedAt?: number,
   deletedAt?: number,
 };
+
+export { Store } from "./store";
+export { default as MemoryStore } from "./memory-store";
 
 // polyfill Set.intersection
 ; (function () {
@@ -37,7 +41,7 @@ export type RedisStoreRecord = {
   }
 })();
 
-export default class RedisStore<T extends RedisStoreRecord> {
+export default class RedisStore<T extends RedisStoreRecord> implements Store<T> {
   redis: Redis;
   key: string;
   setKey: string;

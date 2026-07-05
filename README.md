@@ -12,6 +12,8 @@ Leans into Redis’ strong suits to bring relational aspects to the simple but p
 
 Plays well with Upstash and Vercel but will work with any Redis instance via REST API.
 
+Also ships with `MemoryStore`, a pure in-memory implementation of `RedisStore` — a drop-in swap for local development and tests that don't need (or want) a live Redis instance. See [In-memory store](#in-memory-store) below.
+
 
 ## Installation
 
@@ -171,3 +173,50 @@ await Promise.all([
 // ZREM testthings:user:<USER_UUID> <UUID>
 // ...
 ```
+
+
+## In-memory store
+
+`MemoryStore<T>` implements the exact same `Store<T>` interface as `RedisStore<T>` but keeps everything in plain JS `Map`s — no Redis connection, no environment variables, no network calls. Application code written against `Store<T>` can swap between the two without any changes.
+
+```typescript
+import { MemoryStore } from '@desmat/redis-store';
+
+const store = {
+  users: new MemoryStore<User>({ key: "user" }),
+  things: new MemoryStore<Thing>({ key: "thing", options: ThingOptions }),
+};
+
+const user = await store.users.create({ name: "User One" });
+const things = await store.things.find({ user: user.id });
+```
+
+Useful for:
+- Local development without provisioning a real Redis instance
+- Test suites that need fast, isolated, disposable data (each `MemoryStore` instance is its own private state — nothing persists between processes, and nothing is shared unless you share the instance)
+
+Constructor accepts an optional `seed` array to pre-populate records (and their lookup indices) at construction time, so seeded data is immediately queryable via `find`/`ids` without needing to call `.create()` for each one:
+
+```typescript
+const things = new MemoryStore<Thing>({
+  key: "thing",
+  options: ThingOptions,
+  seed: [
+    { id: "thing-1", createdAt: Date.now(), createdBy: "user-1", label: "Seeded thing" },
+  ],
+});
+```
+
+Notes on parity with `RedisStore`:
+- `create`/`update`/`delete`/lookup/counter semantics are ported 1:1, including Redis's rank-based (not score-range) windowing for `count`/`offset` in `ids()`/`find()`, and `queryCounter`'s lexicographic range-bound behavior for `incrementCounters`/`queryCounter`.
+- `options.expire` is a no-op (data is ephemeral for the life of the process anyway).
+- There's no equivalent to `RedisStore`'s raw `.redis` client escape hatch — code that reaches through it directly for one-off scripts (rather than going through the `Store<T>` methods) isn't portable to `MemoryStore`.
+
+
+## Testing
+
+```bash
+npm test
+```
+
+Runs the `MemoryStore` unit test suite (`test/*.test.ts`) via Node's built-in test runner (through `tsx`) — no live Redis needed. `RedisStore` itself has no automated tests; it's a thin wrapper around `@upstash/redis`.
