@@ -18,6 +18,7 @@
 import moment from "moment";
 import { uuid } from "@desmat/utils";
 import { Redis } from "@upstash/redis";
+import type { Store } from "./store";
 
 export type RedisStoreRecord = {
   id: string,
@@ -25,6 +26,9 @@ export type RedisStoreRecord = {
   updatedAt?: number,
   deletedAt?: number,
 };
+
+export { Store } from "./store";
+export { default as MemoryStore } from "./memory-store";
 
 // polyfill Set.intersection
 ; (function () {
@@ -37,7 +41,7 @@ export type RedisStoreRecord = {
   }
 })();
 
-export default class RedisStore<T extends RedisStoreRecord> {
+export default class RedisStore<T extends RedisStoreRecord> implements Store<T> {
   redis: Redis;
   key: string;
   setKey: string;
@@ -346,10 +350,17 @@ export default class RedisStore<T extends RedisStoreRecord> {
     return updatedValue;
   }
 
-  async incrementCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
-    this.debug && console.log(`RedisStore<${this.key}>.incrementCounters`, { values, delta });
+  async incCounters(values: Record<string, string | number>, delta: { total: number, count: number }): Promise<any> {
+    this.debug && console.log(`RedisStore<${this.key}>.incCounters`, { values, delta });
 
     const counters: string[] = this.options?.counters || [];
+
+    counters
+      .filter((counter: string) => !counter.split(":").every((d: string) => typeof values[d] != "undefined"))
+      .forEach((counter: string) => {
+        const missing = counter.split(":").filter((d: string) => typeof values[d] == "undefined");
+        console.warn(`RedisStore<${this.key}>.incCounters WARNING: skipping counter "${counter}": missing dimension(s) ${missing.join(", ")} in values`, { values });
+      });
 
     const responses = await Promise.all(
       counters
@@ -363,7 +374,7 @@ export default class RedisStore<T extends RedisStoreRecord> {
         })
     );
 
-    this.debug && console.log(`RedisStore<${this.key}>.incrementCounters`, { responses });
+    this.debug && console.log(`RedisStore<${this.key}>.incCounters`, { responses });
 
     return responses;
   }
